@@ -1,0 +1,16 @@
+{
+  "input_directory": "./comic_pages",
+  "output_file": "./comic_pages/panels.json",
+
+  "model_path": "./models/best.pt",
+
+  "reading_direction": "rtl",
+
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.7,
+  "missing_panel_threshold": 0.1,
+
+  "device": "auto",
+
+  "debug": false
+}
