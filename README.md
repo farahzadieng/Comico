@@ -1,7 +1,11 @@
 <div align="center">
-# COMICO
 
+<div style="font-weight:bold; font-size:28px; color:green;"> COMICO </div>
+
+<br/>
 This project is a preprocessing component for a larger digital comic-processing pipeline. Its purpose is to automatically detect comic panels from page images and generate structured metadata that can later be used by other stages such as panel extraction, OCR, translation, or typesetting.
+
+<br/>
 
 </div>
 
