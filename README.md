@@ -15,6 +15,8 @@ uv run --group pipe1 python your_entry_point.py
 
 you need `config.json`, and you may use `01-Panel-Detection/config.example.json` as the example. It locates the input directory.
 
+Model is not downloaded , use backup version and save to `01-Panel-Detection/models/best.pt`
+
 you may place `config.json` in the root directory of the project.
 
 ```bash
