@@ -2,3 +2,4 @@
 .venv/
 samples/
 *__pycache__/
+01-Panel-Detection/models/
