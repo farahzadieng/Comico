@@ -23,6 +23,8 @@ you may place `config.json` in the root directory of the project.
 uv run --group panel python Panel-Detection.py config.json
 ```
 
+**The output would be loaded inside the comic directory in:** `panels.json`
+
 ## Error Handling
 
 In case of getting error with `best.pt` download it from huggingface with :
