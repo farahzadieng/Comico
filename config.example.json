@@ -1,8 +1,7 @@
 {
-  "input_directory": "./comics",
-  "reading_direction": "rtl",
-
+  "input_directory": "./input",
   "model_path": "./01-Panel-Detection/models/best.pt",
+  "reading_direction": "rtl",
 
   "recursive": true,
   "output_filename": "panels.json",
