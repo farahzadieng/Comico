@@ -4,4 +4,16 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "gradio>=6.27.0",
+    "torch>=2.14.0",
+    "ultralytics>=8.4.152",
+]
+
+[dependency-groups]
+panel = [
+    "gradio>=6.27.0",
+    "huggingface-hub>=1.31.0",
+    "torch>=2.14.0",
+    "ultralytics>=8.4.152",
+]
