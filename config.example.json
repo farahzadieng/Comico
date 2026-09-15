@@ -1,0 +1,16 @@
+{
+  "input_directory": "./comics",
+  "reading_direction": "rtl",
+
+  "model_path": "./01-Panel-Detection/models/best.pt",
+
+  "recursive": true,
+  "output_filename": "panels.json",
+
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.7,
+  "missing_panel_threshold": 0.1,
+
+  "device": "auto",
+  "debug": false
+}
