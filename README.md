@@ -2,7 +2,7 @@
 
 ```bash
 uv add --group panel
-uv sync --group pipe1
+uv sync --group panel
 uv sync --all-groups
 uv run --group pipe1 python your_entry_point.py
 ```
