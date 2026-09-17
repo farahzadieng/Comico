@@ -55,6 +55,8 @@ uv run --group pipe1 python your_entry_point.py
 
 **Panel Detection** group name is `panel`
 
+** OCR and render** group name is `ocr`
+
 # 01 - Panel Detection
 
 you need `config.json`, and you may use `01-Panel-Detection/config.example.json` as the example. It locates the input directory.
@@ -80,3 +82,5 @@ uv run hf download \
   --repo-type space \
   --local-dir ./01-Panel-Detection/models
 ```
+
+# 02 - OCR and Render
