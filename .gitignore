@@ -5,3 +5,4 @@ samples/
 01-Panel-Detection/models/
 output.json
 render-*.json
+config.json
