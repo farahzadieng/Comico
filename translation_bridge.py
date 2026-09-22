@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 
-BRIDGE_VERSION = "1.0"
+BRIDGE_VERSION = "1.1"
 
 
 class BridgeError(Exception):
@@ -62,6 +62,16 @@ def source_text(block: dict[str, Any]) -> Any:
         return block["source_text"]
     return block.get("text")
 
+def source_is_missing(block: dict[str, Any]) -> bool:
+    """Return True when detector found a region but OCR produced no usable text."""
+    src = source_text(block)
+    return src is None or (isinstance(src, str) and not src.strip())
+
+
+def translated_is_missing(block: dict[str, Any]) -> bool:
+    value = block.get("translated")
+    return value is None or (isinstance(value, str) and not value.strip())
+
 
 def iter_original_blocks(project: dict[str, Any]):
     images = project.get("images")
@@ -97,6 +107,40 @@ def iter_original_blocks(project: dict[str, Any]):
             yield image, block, ref
 
 
+def normalize_no_source_blocks(project: dict[str, Any]) -> int:
+    """
+    Disable translate for detector regions where OCR returned no source text.
+    These blocks cannot be translated reliably and otherwise fail renderer validation.
+    """
+    changed = 0
+    for _image, block, _ref in iter_original_blocks(project):
+        if block.get("translate") is True and source_is_missing(block):
+            block["translate"] = False
+            block["translated"] = None
+            changed += 1
+    return changed
+
+
+def validate_render_ready(project: dict[str, Any]) -> None:
+    """Ensure every active translate=true block is safe for the renderer."""
+    errors: list[str] = []
+    for _image, block, ref in iter_original_blocks(project):
+        if block.get("translate") is not True:
+            continue
+        src = source_text(block)
+        if not isinstance(src, str) or not src.strip():
+            errors.append(f"{ref}: active block has no usable OCR source")
+            continue
+        translated = block.get("translated")
+        if not isinstance(translated, str) or not translated.strip():
+            errors.append(f"{ref}: active block has no usable translation")
+
+    if errors:
+        preview = "\n  - ".join(errors[:20])
+        suffix = f"\n  ... and {len(errors) - 20} more" if len(errors) > 20 else ""
+        raise BridgeError("Output is not renderer-ready:\n  - " + preview + suffix)
+
+
 def export_bridge(original: dict[str, Any]) -> dict[str, Any]:
     pages: list[dict[str, Any]] = []
     total = 0
@@ -118,7 +162,7 @@ def export_bridge(original: dict[str, Any]) -> dict[str, Any]:
                 continue
 
             src = source_text(block)
-            if src is None:
+            if src is None or (isinstance(src, str) and not src.strip()):
                 continue
             if not isinstance(src, str):
                 raise BridgeError(
@@ -188,9 +232,19 @@ def import_bridge(
     bridge: dict[str, Any],
     *,
     allow_missing: bool = False,
-) -> tuple[dict[str, Any], int]:
+) -> tuple[dict[str, Any], dict[str, int]]:
     result = copy.deepcopy(original)
     translated_items = bridge_items(bridge)
+
+    stats = {
+        "merged": 0,
+        "disabled_no_source": 0,
+        "disabled_missing_translation": 0,
+    }
+
+    # Critical renderer-safety fix: regions detected without OCR text are not
+    # translation targets, even if OCR JSON originally marked translate=true.
+    stats["disabled_no_source"] = normalize_no_source_blocks(result)
 
     expected: dict[str, tuple[dict[str, Any], str]] = {}
 
@@ -199,10 +253,8 @@ def import_bridge(
             continue
 
         src = source_text(block)
-        if src is None:
-            continue
-        if not isinstance(src, str):
-            raise BridgeError(f"Invalid original source text for {ref}")
+        if not isinstance(src, str) or not src.strip():
+            raise BridgeError(f"Invalid original source text for active block {ref}")
 
         expected[ref] = (block, src)
 
@@ -211,7 +263,8 @@ def import_bridge(
         preview = ", ".join(unexpected[:5])
         suffix = " ..." if len(unexpected) > 5 else ""
         raise BridgeError(
-            f"Translation JSON contains {len(unexpected)} unknown id(s): {preview}{suffix}"
+            f"Translation JSON contains {len(unexpected)} unknown/non-translatable id(s): "
+            f"{preview}{suffix}"
         )
 
     missing = sorted(set(expected) - set(translated_items))
@@ -222,7 +275,14 @@ def import_bridge(
             f"Translation JSON is missing {len(missing)} expected id(s): {preview}{suffix}"
         )
 
-    merged = 0
+    # If incomplete translation is explicitly allowed, deactivate missing blocks
+    # so the generated file remains renderer-safe.
+    if allow_missing:
+        for ref in missing:
+            block, _src = expected[ref]
+            block["translate"] = False
+            block["translated"] = None
+            stats["disabled_missing_translation"] += 1
 
     for ref, item in translated_items.items():
         block, original_source = expected[ref]
@@ -235,25 +295,24 @@ def import_bridge(
             )
 
         translated = item.get("translated")
-        if translated is None:
+        if translated is None or (isinstance(translated, str) and not translated.strip()):
             if allow_missing:
+                block["translate"] = False
+                block["translated"] = None
+                stats["disabled_missing_translation"] += 1
                 continue
-            raise BridgeError(f"'translated' is still null for {ref}")
+            raise BridgeError(f"'translated' is still null/empty for {ref}")
 
         if not isinstance(translated, str):
             raise BridgeError(f"'translated' must be a string for {ref}")
 
-        translated = translated.strip()
-        if not translated:
-            if allow_missing:
-                continue
-            raise BridgeError(f"'translated' is empty for {ref}")
+        # This is the ONLY AI-provided field copied back from the AI-facing JSON.
+        block["translated"] = translated.strip()
+        stats["merged"] += 1
 
-        # This is the ONLY field copied back from the AI-facing JSON.
-        block["translated"] = translated
-        merged += 1
-
-    return result, merged
+    # Final guard: never write a file that immediately fails renderer validation.
+    validate_render_ready(result)
+    return result, stats
 
 
 def split_bridge_by_pages(
@@ -384,15 +443,50 @@ def cmd_import(args: argparse.Namespace) -> None:
     original = load_json(original_path)
     bridge = combine_translation_files(translation_paths)
 
-    result, merged = import_bridge(
+    result, stats = import_bridge(
         original,
         bridge,
         allow_missing=args.allow_missing,
     )
     save_json(output_path, result)
 
-    print(f"Created merged render JSON: {output_path}")
-    print(f"Merged translations: {merged}")
+    print(f"Created renderer-ready JSON: {output_path}")
+    print(f"Merged translations: {stats['merged']}")
+    print(f"Disabled blocks with no OCR source: {stats['disabled_no_source']}")
+    if stats["disabled_missing_translation"]:
+        print(
+            "Disabled untranslated blocks because --allow-missing was used: "
+            f"{stats['disabled_missing_translation']}"
+        )
+
+
+def cmd_repair(args: argparse.Namespace) -> None:
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    project = load_json(input_path)
+    result = copy.deepcopy(project)
+
+    disabled_no_source = normalize_no_source_blocks(result)
+    disabled_missing_translation = 0
+
+    if args.skip_untranslated:
+        for _image, block, _ref in iter_original_blocks(result):
+            if block.get("translate") is True and translated_is_missing(block):
+                block["translate"] = False
+                block["translated"] = None
+                disabled_missing_translation += 1
+
+    validate_render_ready(result)
+    save_json(output_path, result)
+
+    print(f"Created repaired renderer JSON: {output_path}")
+    print(f"Disabled blocks with no OCR source: {disabled_no_source}")
+    if args.skip_untranslated:
+        print(
+            "Disabled remaining active blocks with missing translations: "
+            f"{disabled_missing_translation}"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -436,9 +530,32 @@ def build_parser() -> argparse.ArgumentParser:
     import_parser.add_argument(
         "--allow-missing",
         action="store_true",
-        help="Allow null/empty/missing translations and merge only completed items.",
+        help=(
+            "Allow null/empty/missing translations. Those blocks are automatically "
+            "set to translate=false so the result remains renderer-safe."
+        ),
     )
     import_parser.set_defaults(func=cmd_import)
+
+    repair_parser = sub.add_parser(
+        "repair",
+        help="Repair an already merged full JSON for renderer validation.",
+    )
+    repair_parser.add_argument("input", help="Existing full/merged JSON.")
+    repair_parser.add_argument(
+        "--output",
+        required=True,
+        help="Repaired renderer-ready JSON to create.",
+    )
+    repair_parser.add_argument(
+        "--skip-untranslated",
+        action="store_true",
+        help=(
+            "Also disable active blocks that have OCR source text but still lack a "
+            "translation. Without this flag, those remain validation errors."
+        ),
+    )
+    repair_parser.set_defaults(func=cmd_repair)
 
     return parser
 
