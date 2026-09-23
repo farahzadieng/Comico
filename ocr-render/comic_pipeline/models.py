@@ -4,7 +4,7 @@ import hashlib
 import urllib.request
 from pathlib import Path
 
-MODEL_CACHE = Path.home() / ".cache" / "comic-ocr-render"
+MODEL_CACHE = Path(__file__).resolve().parents[2] / "models"
 
 
 def download(url: str, relative: str, sha256: str | None = None) -> Path:

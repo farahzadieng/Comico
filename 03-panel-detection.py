@@ -4,7 +4,7 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parent
-PROJECT = ROOT / "01-Panel-Detection"
+PROJECT = ROOT / "panel-detection"
 MAIN = PROJECT / "main.py"
 
 

@@ -2,7 +2,8 @@
 .venv/
 samples/
 *__pycache__/
-01-Panel-Detection/models/
+panel-detection/models/
+models/
 output.json
 render-*.json
 config.json
