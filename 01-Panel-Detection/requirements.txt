@@ -1,3 +1,0 @@
-torch #2.7.1
-ultralytics #8.3.160
-gradio #5.35.0

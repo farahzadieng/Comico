@@ -2,7 +2,7 @@
   "input_directory": "./samples/Batman01",
   "output_file": "./samples/Batman01/panels.json",
 
-  "model_path": "./01-Panel-Detection/models/best.pt",
+  "model_path": "./models/best.pt",
 
   "reading_direction": "ltr",
 
