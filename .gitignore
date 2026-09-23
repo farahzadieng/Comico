@@ -1,9 +1,11 @@
+# --- CACHING --- 
 .DS_Store
 .venv/
-samples/
 *__pycache__/
+# --- SAMPLES AND DATA --- 
+samples/
+*.json
+# --- MODELS --- 
 panel-detection/models/
 models/
-output.json
-render-*.json
-config.json
+models.zip
